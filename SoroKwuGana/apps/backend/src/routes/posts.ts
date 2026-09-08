@@ -1,52 +1,51 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma } from '../lib/prisma.js';
+import { Post } from '../models/Post.js';
+import { Tag } from '../models/Tag.js';
+import { Category } from '../models/Category.js';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 const PostSchema = z.object({
-  title: z.string().min(3),
-  slug: z.string().min(3).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase with hyphens only'),
-  excerpt: z.string().optional(),
-  content: z.string().min(1),
-  coverImage: z.string().url().optional(),
-  published: z.boolean().optional(),
-  featured: z.boolean().optional(),
-  categoryId: z.string(),
-  tags: z.array(z.string()).optional(),
+  title:       z.string().min(3),
+  slug:        z.string().min(3).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase with hyphens only'),
+  excerpt:     z.string().optional(),
+  content:     z.string().min(1),
+  coverImage:  z.string().url().optional().or(z.literal('')),
+  published:   z.boolean().optional(),
+  featured:    z.boolean().optional(),
+  categoryId:  z.string(),
+  tags:        z.array(z.string()).optional(),
 });
 
 // GET /api/posts — public, published only
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 12));
-    const category = Array.isArray(req.query.category) ? req.query.category[0] : req.query.category;
+    const page     = Math.max(1, Number(req.query.page) || 1);
+    const limit    = Math.min(50, Math.max(1, Number(req.query.limit) || 12));
+    const catSlug  = req.query.category as string | undefined;
     const featured = req.query.featured === 'true';
 
-    const where = {
-      published: true,
-      ...(category && { category: { slug: category as string } }),
-      ...(featured && { featured: true }),
-    };
+    // Build filter
+    const filter: Record<string, unknown> = { published: true };
+    if (catSlug) {
+      const cat = await Category.findOne({ slug: catSlug });
+      if (cat) filter.category = cat._id;
+    }
+    if (featured) filter.featured = true;
 
     const [posts, total] = await Promise.all([
-      prisma.post.findMany({
-        where,
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { publishedAt: 'desc' },
-        select: {
-          id: true, title: true, slug: true, excerpt: true,
-          coverImage: true, featured: true, views: true,
-          publishedAt: true, createdAt: true,
-          category: { select: { name: true, slug: true } },
-          author: { select: { name: true, avatar: true } },
-          tags: { select: { tag: { select: { name: true, slug: true } } } },
-        },
-      }),
-      prisma.post.count({ where }),
+      Post.find(filter)
+        .sort({ publishedAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('category', 'name slug')
+        .populate('author', 'name avatar')
+        .populate('tags', 'name slug')
+        .select('-content')
+        .lean(),
+      Post.countDocuments(filter),
     ]);
 
     res.json({ posts, total, page, pages: Math.ceil(total / limit) });
@@ -58,21 +57,19 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 // GET /api/posts/:slug — public
 router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const post = await prisma.post.findUnique({
-      where: { slug: String(req.params.slug), published: true },
-      include: {
-        category: true,
-        author: { select: { name: true, avatar: true, bio: true } },
-        tags: { include: { tag: true } },
-        comments: { where: { approved: true }, orderBy: { createdAt: 'asc' } },
-      },
-    });
+    const post = await Post.findOne({ slug: req.params.slug, published: true })
+      .populate('category')
+      .populate('author', 'name avatar bio')
+      .populate('tags', 'name slug');
+
     if (!post) {
       res.status(404).json({ message: 'Post not found' });
       return;
     }
+
     // Increment view count
-    await prisma.post.update({ where: { id: post.id }, data: { views: { increment: 1 } } });
+    await Post.findByIdAndUpdate(post._id, { $inc: { views: 1 } });
+
     res.json(post);
   } catch (err) {
     next(err);
@@ -83,28 +80,29 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
 router.post('/', authenticate, requireRole('ADMIN', 'SUPER_ADMIN', 'AUTHOR'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const data = PostSchema.parse(req.body);
-      const { tags, ...postData } = data;
-      const post = await prisma.post.create({
-        data: {
-          ...postData,
-          authorId: req.user!.userId,
-          publishedAt: postData.published ? new Date() : null,
-          ...(tags?.length && {
-            tags: {
-              create: await Promise.all(
-                tags.map(async (name) => {
-                  const slug = name.toLowerCase().replace(/\s+/g, '-');
-                  const tag = await prisma.tag.upsert({
-                    where: { slug }, update: {}, create: { name, slug },
-                  });
-                  return { tagId: tag.id };
-                })
-              ),
-            },
-          }),
-        },
+      const { tags, categoryId, ...rest } = PostSchema.parse(req.body);
+
+      // Resolve tag ObjectIds (upsert each)
+      const tagIds = await Promise.all(
+        (tags ?? []).map(async (name) => {
+          const slug = name.toLowerCase().replace(/\s+/g, '-');
+          const tag = await Tag.findOneAndUpdate(
+            { slug },
+            { $setOnInsert: { name, slug } },
+            { upsert: true, new: true }
+          );
+          return tag!._id;
+        })
+      );
+
+      const post = await Post.create({
+        ...rest,
+        category:    categoryId,
+        author:      req.user!.userId,
+        tags:        tagIds,
+        publishedAt: rest.published ? new Date() : undefined,
       });
+
       res.status(201).json(post);
     } catch (err) {
       next(err);
@@ -116,22 +114,17 @@ router.post('/', authenticate, requireRole('ADMIN', 'SUPER_ADMIN', 'AUTHOR'),
 router.patch('/:id', authenticate, requireRole('ADMIN', 'SUPER_ADMIN', 'AUTHOR'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const data = PostSchema.partial().parse(req.body);
-      const { tags: _tags, ...postData } = data;
-      const post = await prisma.post.update({
-        where: { id: String(req.params.id) },
-        data: {
-          title: postData.title,
-          slug: postData.slug,
-          excerpt: postData.excerpt,
-          content: postData.content,
-          coverImage: postData.coverImage ?? null,
-          published: postData.published,
-          featured: postData.featured,
-          categoryId: postData.categoryId,
-          ...(postData.published === true && { publishedAt: new Date() }),
-        },
-      });
+      const { tags: _tags, categoryId, ...rest } = PostSchema.partial().parse(req.body);
+
+      const update: Record<string, unknown> = { ...rest };
+      if (categoryId) update.category = categoryId;
+      if (rest.published === true) update.publishedAt = new Date();
+
+      const post = await Post.findByIdAndUpdate(req.params.id, update, { new: true });
+      if (!post) {
+        res.status(404).json({ message: 'Post not found' });
+        return;
+      }
       res.json(post);
     } catch (err) {
       next(err);
@@ -141,9 +134,13 @@ router.patch('/:id', authenticate, requireRole('ADMIN', 'SUPER_ADMIN', 'AUTHOR')
 
 // DELETE /api/posts/:id — admin and above
 router.delete('/:id', authenticate, requireRole('ADMIN', 'SUPER_ADMIN'),
-  async (_req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await prisma.post.delete({ where: { id: String(_req.params.id) } });
+      const post = await Post.findByIdAndDelete(req.params.id);
+      if (!post) {
+        res.status(404).json({ message: 'Post not found' });
+        return;
+      }
       res.status(204).send();
     } catch (err) {
       next(err);

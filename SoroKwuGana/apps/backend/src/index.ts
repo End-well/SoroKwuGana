@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+import { connectDB, disconnectDB } from './config/database.js';
 import router from './routes/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -28,7 +29,7 @@ if (process.env.NODE_ENV !== 'test') {
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
+  windowMs: 15 * 60 * 1000,
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
@@ -47,10 +48,24 @@ app.use((_req, res) => {
 // ── Error handler ─────────────────────────────────────────────────────────────
 app.use(errorHandler);
 
-// ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀  Backend running at http://localhost:${PORT}`);
-  console.log(`   Environment: ${process.env.NODE_ENV ?? 'development'}`);
+// ── Connect DB then start ─────────────────────────────────────────────────────
+connectDB().then(() => {
+  const server = app.listen(PORT, () => {
+    console.log(`🚀  Backend running at http://localhost:${PORT}`);
+    console.log(`   Environment: ${process.env.NODE_ENV ?? 'development'}`);
+  });
+
+  // Graceful shutdown
+  const shutdown = async () => {
+    console.log('\n⏳ Shutting down...');
+    server.close(async () => {
+      await disconnectDB();
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 });
 
 export default app;

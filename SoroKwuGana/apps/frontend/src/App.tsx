@@ -1,20 +1,20 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Layout from './components/layout/Layout';
-import Home from './pages/Home';
-import About from './pages/About';
-import Contact from './pages/Contact';
-import Trending from './pages/Trending';
-import Reviews from './pages/Reviews';
-import Article from './pages/Article';
-import Movies from './pages/categories/Movies';
-import TVShows from './pages/categories/TVShows';
-import Music from './pages/categories/Music';
-import Celebrity from './pages/categories/Celebrity';
-import Fashion from './pages/categories/Fashion';
-import Beauty from './pages/categories/Beauty';
-import Health from './pages/categories/Health';
-import Travel from './pages/categories/Travel';
-import Food from './pages/categories/Food';
+import Layout from './user/components/layout/Layout';
+import Home from './user/pages/Home';
+import About from './user/pages/About';
+import Contact from './user/pages/Contact';
+import Trending from './user/pages/Trending';
+import Reviews from './user/pages/Reviews';
+import Article from './user/pages/Article';
+import Movies from './user/pages/categories/Movies';
+import TVShows from './user/pages/categories/TVShows';
+import Music from './user/pages/categories/Music';
+import Celebrity from './user/pages/categories/Celebrity';
+import Fashion from './user/pages/categories/Fashion';
+import Beauty from './user/pages/categories/Beauty';
+import Health from './user/pages/categories/Health';
+import Travel from './user/pages/categories/Travel';
+import Food from './user/pages/categories/Food';
 import './App.css';
 
 function NotFound() {
