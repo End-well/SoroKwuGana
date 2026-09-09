@@ -2,11 +2,11 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
-  { label: 'Dashboard', href: '/', icon: '📊' },
-  { label: 'Posts', href: '/posts', icon: '📝' },
-  { label: 'Categories', href: '/categories', icon: '🗂️' },
-  { label: 'Comments', href: '/comments', icon: '💬' },
-  { label: 'Users', href: '/users', icon: '👥' },
+  { label: 'Dashboard',  href: '/admin',            icon: '📊' },
+  { label: 'Posts',      href: '/admin/posts',       icon: '📝' },
+  { label: 'Categories', href: '/admin/categories',  icon: '🗂️' },
+  { label: 'Comments',   href: '/admin/comments',    icon: '💬' },
+  { label: 'Users',      href: '/admin/users',       icon: '👥' },
 ];
 
 export default function AdminLayout() {
@@ -15,7 +15,7 @@ export default function AdminLayout() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/admin/login');
   };
 
   return (
@@ -34,7 +34,7 @@ export default function AdminLayout() {
             <NavLink
               key={item.href}
               to={item.href}
-              end={item.href === '/'}
+              end={item.href === '/admin'}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                   isActive
