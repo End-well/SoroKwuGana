@@ -149,3 +149,6 @@ router.delete('/:id', authenticate, requireRole('ADMIN', 'SUPER_ADMIN'),
 );
 
 export default router;
+);
+
+export default router;

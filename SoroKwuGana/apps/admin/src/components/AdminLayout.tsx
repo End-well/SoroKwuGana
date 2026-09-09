@@ -2,11 +2,11 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
-  { label: 'Dashboard',  href: '/admin',            icon: '📊' },
-  { label: 'Posts',      href: '/admin/posts',       icon: '📝' },
-  { label: 'Categories', href: '/admin/categories',  icon: '🗂️' },
-  { label: 'Comments',   href: '/admin/comments',    icon: '💬' },
-  { label: 'Users',      href: '/admin/users',       icon: '👥' },
+  { label: 'Dashboard',  href: '/',            icon: '📊' },
+  { label: 'Posts',      href: '/posts',        icon: '📝' },
+  { label: 'Categories', href: '/categories',   icon: '🗂️' },
+  { label: 'Comments',   href: '/comments',     icon: '💬' },
+  { label: 'Users',      href: '/users',        icon: '👥' },
 ];
 
 export default function AdminLayout() {
@@ -15,7 +15,7 @@ export default function AdminLayout() {
 
   const handleLogout = () => {
     logout();
-    navigate('/admin/login');
+    navigate('/login');
   };
 
   return (
@@ -34,11 +34,11 @@ export default function AdminLayout() {
             <NavLink
               key={item.href}
               to={item.href}
-              end={item.href === '/admin'}
+              end={item.href === '/'}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-rose-500 text-white'
+                    ? 'bg-gradient-to-r from-[#6C63FF] to-[#FF4D6D] text-white shadow-md'
                     : 'text-gray-400 hover:text-white hover:bg-gray-800'
                 }`
               }
@@ -51,12 +51,12 @@ export default function AdminLayout() {
 
         <div className="px-3 py-4 border-t border-gray-800">
           <div className="flex items-center gap-3 px-3 py-2 mb-2">
-            <div className="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center text-white text-sm font-bold">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6C63FF] to-[#FF4D6D] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
               {user?.name?.[0]?.toUpperCase()}
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-              <p className="text-xs text-gray-500 truncate">{user?.role}</p>
+              <p className="text-xs text-gray-500 truncate">{user?.role?.replace('_', ' ')}</p>
             </div>
           </div>
           <button
