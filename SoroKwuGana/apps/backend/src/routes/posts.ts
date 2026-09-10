@@ -7,16 +7,26 @@ import { authenticate, requireRole, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
+const MediaItemSchema = z.object({
+  url:     z.string().url(),
+  type:    z.enum(['image', 'video']),
+  caption: z.string().optional(),
+  source:  z.string().optional(),
+});
+
 const PostSchema = z.object({
-  title:       z.string().min(3),
-  slug:        z.string().min(3).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase with hyphens only'),
-  excerpt:     z.string().optional(),
-  content:     z.string().min(1),
-  coverImage:  z.string().url().optional().or(z.literal('')),
-  published:   z.boolean().optional(),
-  featured:    z.boolean().optional(),
-  categoryId:  z.string(),
-  tags:        z.array(z.string()).optional(),
+  title:           z.string().min(3),
+  slug:            z.string().min(3).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase with hyphens only'),
+  excerpt:         z.string().optional(),
+  content:         z.string().min(1),
+  coverImage:      z.string().url().optional().or(z.literal('')),
+  referenceImages: z.array(MediaItemSchema).optional().default([]),
+  videos:          z.array(MediaItemSchema).optional().default([]),
+  published:       z.boolean().optional(),
+  featured:        z.boolean().optional(),
+  breaking:        z.boolean().optional(),
+  categoryId:      z.string(),
+  tags:            z.array(z.string()).optional(),
 });
 
 // GET /api/posts — public, published only
@@ -27,7 +37,6 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const catSlug  = req.query.category as string | undefined;
     const featured = req.query.featured === 'true';
 
-    // Build filter
     const filter: Record<string, unknown> = { published: true };
     if (catSlug) {
       const cat = await Category.findOne({ slug: catSlug });
@@ -43,7 +52,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         .populate('category', 'name slug')
         .populate('author', 'name avatar')
         .populate('tags', 'name slug')
-        .select('-content')
+        .select('-content -referenceImages -videos')
         .lean(),
       Post.countDocuments(filter),
     ]);
@@ -54,7 +63,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// GET /api/posts/:slug — public
+// GET /api/posts/:slug — public, full post with all media
 router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const post = await Post.findOne({ slug: req.params.slug, published: true })
@@ -67,9 +76,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       return;
     }
 
-    // Increment view count
     await Post.findByIdAndUpdate(post._id, { $inc: { views: 1 } });
-
     res.json(post);
   } catch (err) {
     next(err);
@@ -82,7 +89,6 @@ router.post('/', authenticate, requireRole('ADMIN', 'SUPER_ADMIN', 'AUTHOR'),
     try {
       const { tags, categoryId, ...rest } = PostSchema.parse(req.body);
 
-      // Resolve tag ObjectIds (upsert each)
       const tagIds = await Promise.all(
         (tags ?? []).map(async (name) => {
           const slug = name.toLowerCase().replace(/\s+/g, '-');
