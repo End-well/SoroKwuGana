@@ -3,17 +3,15 @@ import mongoose from 'mongoose';
 const MONGODB_URI =
   process.env.MONGODB_URI ?? 'mongodb://localhost:27017/sorokwugana';
 
-// Mongoose global settings
 mongoose.set('strictQuery', true);
 
 export async function connectDB(): Promise<void> {
   try {
     const conn = await mongoose.connect(MONGODB_URI, {
-      // Keep alive so the connection doesn't time out between requests
-      serverSelectionTimeoutMS: 5000,  // fail fast if MongoDB is unreachable
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
+      family: 4, // force IPv4 — fixes SRV DNS issues on some systems
     });
-
     console.log(`🍃 MongoDB connected: ${conn.connection.host}`);
     console.log(`   Database: ${conn.connection.name}`);
   } catch (err) {
@@ -22,11 +20,9 @@ export async function connectDB(): Promise<void> {
   }
 }
 
-// Graceful disconnect — called on process exit
 export async function disconnectDB(): Promise<void> {
   await mongoose.disconnect();
   console.log('🔌 MongoDB disconnected');
 }
 
-// Re-export mongoose so the rest of the app imports from one place
 export default mongoose;
