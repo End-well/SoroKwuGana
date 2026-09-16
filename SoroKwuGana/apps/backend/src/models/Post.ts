@@ -15,13 +15,17 @@ export interface IPost extends Document {
   excerpt?: string;
   content: string;
   coverImage?: string;
-  referenceImages: IMediaItem[];   // in-article reference images
-  videos: IMediaItem[];            // embedded video URLs (YouTube, etc.)
+  referenceImages: IMediaItem[];
+  videos: IMediaItem[];
   published: boolean;
   featured: boolean;
   breaking: boolean;
   views: number;
   likes: number;
+  rating?: number;          // admin-set editorial score (1–10)
+  userRatingSum: number;    // sum of all user ratings
+  userRatingCount: number;  // number of user ratings
+  userRatingAvg?: number;   // computed average shown to readers
   category: Types.ObjectId;
   author: Types.ObjectId;
   tags: Types.ObjectId[];
@@ -51,6 +55,10 @@ const PostSchema = new Schema<IPost>(
     breaking:        { type: Boolean, default: false },
     views:           { type: Number, default: 0 },
     likes:           { type: Number, default: 0 },
+    rating:          { type: Number, min: 1, max: 10, default: null },
+    userRatingSum:   { type: Number, default: 0 },
+    userRatingCount: { type: Number, default: 0 },
+    userRatingAvg:   { type: Number, default: null },
     category:        { type: Schema.Types.ObjectId, ref: 'Category', required: true },
     author:          { type: Schema.Types.ObjectId, ref: 'User', required: true },
     tags:            [{ type: Schema.Types.ObjectId, ref: 'Tag' }],

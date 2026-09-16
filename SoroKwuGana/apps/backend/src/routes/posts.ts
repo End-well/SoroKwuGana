@@ -25,11 +25,28 @@ const PostSchema = z.object({
   published:       z.boolean().optional(),
   featured:        z.boolean().optional(),
   breaking:        z.boolean().optional(),
+  rating:          z.number().min(1).max(10).optional().nullable(),
   categoryId:      z.string(),
   tags:            z.array(z.string()).optional(),
 });
 
-// GET /api/posts — public, published only
+// ── Shared tag upsert helper ──────────────────────────────────────────────────
+async function upsertTags(names: string[]): Promise<string[]> {
+  const ids = await Promise.all(
+    names.map(async (name) => {
+      const slug = name.toLowerCase().trim().replace(/\s+/g, '-');
+      const tag = await Tag.findOneAndUpdate(
+        { slug },
+        { $setOnInsert: { name: name.trim(), slug } },
+        { upsert: true, new: true }
+      );
+      return tag!._id.toString();
+    })
+  );
+  return ids;
+}
+
+// ── GET /api/posts — public, published only ───────────────────────────────────
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page     = Math.max(1, Number(req.query.page) || 1);
@@ -38,15 +55,23 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const featured = req.query.featured === 'true';
 
     const filter: Record<string, unknown> = { published: true };
+
     if (catSlug) {
       const cat = await Category.findOne({ slug: catSlug });
       if (cat) filter.category = cat._id;
+      // If category slug was given but not found, return empty — don't ignore it
+      else {
+        res.json({ posts: [], total: 0, page, pages: 0 });
+        return;
+      }
     }
+
     if (featured) filter.featured = true;
 
     const [posts, total] = await Promise.all([
       Post.find(filter)
-        .sort({ publishedAt: -1 })
+        // Sort: published posts first by publishedAt, fall back to createdAt
+        .sort({ publishedAt: -1, createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .populate('category', 'name slug')
@@ -63,12 +88,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// GET /api/posts/:slug — public, full post with all media
+// ── GET /api/posts/:slug — public, full post with all media ───────────────────
 router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const post = await Post.findOne({ slug: req.params.slug, published: true })
-      .populate('category')
-      .populate('author', 'name avatar bio')
+      .populate('category', 'name slug parent')
+      .populate('author', 'name avatar bio role')
       .populate('tags', 'name slug');
 
     if (!post) {
@@ -76,57 +101,74 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
       return;
     }
 
-    await Post.findByIdAndUpdate(post._id, { $inc: { views: 1 } });
+    // Increment view count async — don't await so response is fast
+    Post.findByIdAndUpdate(post._id, { $inc: { views: 1 } }).exec();
     res.json(post);
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/posts — authors and above
+// ── POST /api/posts — authors and above ───────────────────────────────────────
 router.post('/', authenticate, requireRole('ADMIN', 'SUPER_ADMIN', 'AUTHOR'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tags, categoryId, ...rest } = PostSchema.parse(req.body);
 
-      const tagIds = await Promise.all(
-        (tags ?? []).map(async (name) => {
-          const slug = name.toLowerCase().replace(/\s+/g, '-');
-          const tag = await Tag.findOneAndUpdate(
-            { slug },
-            { $setOnInsert: { name, slug } },
-            { upsert: true, new: true }
-          );
-          return tag!._id;
-        })
-      );
+      const tagIds = tags?.length ? await upsertTags(tags) : [];
 
+      const now = new Date();
       const post = await Post.create({
         ...rest,
         category:    categoryId,
         author:      req.user!.userId,
         tags:        tagIds,
-        publishedAt: rest.published ? new Date() : undefined,
+        // Set publishedAt immediately if published on creation
+        publishedAt: rest.published ? now : undefined,
       });
 
-      res.status(201).json(post);
+      // Return fully populated post so admin gets complete data back
+      const populated = await Post.findById(post._id)
+        .populate('category', 'name slug')
+        .populate('author', 'name avatar')
+        .populate('tags', 'name slug');
+
+      res.status(201).json(populated);
     } catch (err) {
       next(err);
     }
   }
 );
 
-// PATCH /api/posts/:id — owner or admin
+// ── PATCH /api/posts/:id — owner or admin ─────────────────────────────────────
 router.patch('/:id', authenticate, requireRole('ADMIN', 'SUPER_ADMIN', 'AUTHOR'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { tags: _tags, categoryId, ...rest } = PostSchema.partial().parse(req.body);
+      const { tags, categoryId, ...rest } = PostSchema.partial().parse(req.body);
 
       const update: Record<string, unknown> = { ...rest };
-      if (categoryId) update.category = categoryId;
-      if (rest.published === true) update.publishedAt = new Date();
 
-      const post = await Post.findByIdAndUpdate(req.params.id, update, { new: true });
+      if (categoryId) update.category = categoryId;
+
+      // Always update tags when they are sent (including empty array to clear them)
+      if (tags !== undefined) {
+        update.tags = tags.length ? await upsertTags(tags) : [];
+      }
+
+      // Set publishedAt the first time a post goes live
+      if (rest.published === true) {
+        // Only set if not already set — use $set conditionally via findById check
+        const existing = await Post.findById(req.params.id).select('publishedAt').lean();
+        if (existing && !existing.publishedAt) {
+          update.publishedAt = new Date();
+        }
+      }
+
+      const post = await Post.findByIdAndUpdate(req.params.id, update, { new: true })
+        .populate('category', 'name slug')
+        .populate('author', 'name avatar')
+        .populate('tags', 'name slug');
+
       if (!post) {
         res.status(404).json({ message: 'Post not found' });
         return;
@@ -138,7 +180,42 @@ router.patch('/:id', authenticate, requireRole('ADMIN', 'SUPER_ADMIN', 'AUTHOR')
   }
 );
 
-// DELETE /api/posts/:id — admin and above
+// ── POST /api/posts/:id/rate — public, user community rating ─────────────────
+router.post('/:id/rate', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const score = Number(req.body.score);
+    if (!score || score < 1 || score > 10 || !Number.isInteger(score)) {
+      res.status(400).json({ message: 'Score must be an integer between 1 and 10.' });
+      return;
+    }
+
+    const post = await Post.findByIdAndUpdate(
+      req.params.id,
+      {
+        $inc: { userRatingSum: score, userRatingCount: 1 },
+      },
+      { new: true }
+    ).select('userRatingSum userRatingCount userRatingAvg').lean();
+
+    if (!post) {
+      res.status(404).json({ message: 'Post not found' });
+      return;
+    }
+
+    // Recompute and persist the average
+    const avg = parseFloat((post.userRatingSum / post.userRatingCount).toFixed(1));
+    await Post.findByIdAndUpdate(req.params.id, { userRatingAvg: avg });
+
+    res.json({
+      userRatingAvg:   avg,
+      userRatingCount: post.userRatingCount,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── DELETE /api/posts/:id — admin and above ───────────────────────────────────
 router.delete('/:id', authenticate, requireRole('ADMIN', 'SUPER_ADMIN'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

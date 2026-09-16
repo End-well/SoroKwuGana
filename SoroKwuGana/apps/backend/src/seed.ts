@@ -31,6 +31,7 @@ async function main() {
     { name: 'Health',    slug: 'health',    parent: 'lifestyle' },
     { name: 'Travel',    slug: 'travel',    parent: 'lifestyle' },
     { name: 'Food',      slug: 'food',      parent: 'lifestyle' },
+    { name: 'Reviews',   slug: 'reviews',   parent: 'entertainment', description: 'In-depth reviews of movies, music, games and shows.' },
   ];
 
   for (const cat of categories) {
