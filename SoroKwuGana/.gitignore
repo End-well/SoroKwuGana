@@ -1,36 +1,90 @@
-# Dependencies
-node_modules
-**/node_modules
+# ── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+**/node_modules/
 
-# Build outputs
-dist
-**/dist
-build
-**/build
+# ── Build outputs ─────────────────────────────────────────────────────────────
+dist/
+**/dist/
+dist-ssr/
+build/
+**/build/
+out/
+**/out/
 
-# Environment files
+# ── TypeScript ────────────────────────────────────────────────────────────────
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# ── Environment & secrets ─────────────────────────────────────────────────────
 .env
+.env.*
+!.env.example
 **/.env
-.env.local
-.env.production
+**/.env.*
+!**/.env.example
 
-# Logs
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
-# Editor
+# ── Package manager locks (keep only one — we use npm) ───────────────────────
+yarn.lock
+pnpm-lock.yaml
+
+# ── Vite / frontend cache ─────────────────────────────────────────────────────
+.vite/
+**/.vite/
+*.local
+
+# ── Prisma ────────────────────────────────────────────────────────────────────
+backend/prisma/*.db
+backend/prisma/*.db-journal
+backend/prisma/migrations/dev/
+
+# ── OS generated files ────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+Thumbs.db
+**/Thumbs.db
+Desktop.ini
+
+# ── Editor & IDE ─────────────────────────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
 
-# TypeScript build cache
-*.tsbuildinfo
+# ── Testing ───────────────────────────────────────────────────────────────────
+coverage/
+**/coverage/
+.nyc_output/
 
+<<<<<<< HEAD
 # Prisma
 backend/prisma/dev.db
 backend/prisma/dev.db-journal
 
 # Stray empty folders (VS Code file watcher artifact)
 apps/frontend/src/admin/
+=======
+# ── Misc ─────────────────────────────────────────────────────────────────────
+*.local
+.cache/
+**/.cache/
+tmp/
+temp/
+
+# ── Stale artifact from old apps/ structure ───────────────────────────────────
+apps/
+>>>>>>> c3d54133d6fa350f351e60253bd86029fd540920

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
+<<<<<<< HEAD
     "apps/frontend",
     "apps/admin",
     "apps/backend",
@@ -17,5 +18,17 @@
     "build:frontend": "npm run build --workspace=apps/frontend",
     "build:admin": "npm run build --workspace=apps/admin",
     "build:backend": "npm run build --workspace=apps/backend"
+=======
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=frontend & npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "build": "npm run build --workspace=frontend & npm run build --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:backend": "npm run build --workspace=backend"
+>>>>>>> c3d54133d6fa350f351e60253bd86029fd540920
   }
 }
