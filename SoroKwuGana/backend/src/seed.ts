@@ -9,8 +9,12 @@ async function main() {
   console.log('🌱 Seeding database...');
 
   // ── Admin user ──────────────────────────────────────────────────────────────
-  const email    = process.env.ADMIN_EMAIL    ?? 'sorokwugana@gmail.com';
-  const password = process.env.ADMIN_PASSWORD ?? 'sorokwugana1206';
+  const email    = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+  if (!email || !password) {
+    console.error('❌ ADMIN_EMAIL and ADMIN_PASSWORD must be set in .env');
+    process.exit(1);
+  }
   const hashed   = await bcrypt.hash(password, 12);
 
   await User.findOneAndUpdate(
