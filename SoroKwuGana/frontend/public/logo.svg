@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" fill="none">
+  <!-- Shield outer shape -->
+  <path d="M100 8 L188 45 L188 130 Q188 175 100 212 Q12 175 12 130 L12 45 Z"
+    fill="#2d3748" stroke="#c8a84b" stroke-width="3"/>
+  <!-- Gold accent arc at bottom -->
+  <path d="M35 160 Q100 200 165 160" stroke="#c8a84b" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- Center gold divider line -->
+  <line x1="100" y1="18" x2="100" y2="195" stroke="#c8a84b" stroke-width="2.5"/>
+  <!-- S letter -->
+  <text x="42" y="138" font-family="Georgia, serif" font-weight="900" font-size="82" fill="#e8e8e8" letter-spacing="-4">S</text>
+  <!-- K letter -->
+  <text x="88" y="138" font-family="Georgia, serif" font-weight="900" font-size="82" fill="#e8e8e8" letter-spacing="-4">K</text>
+  <!-- G letter -->
+  <text x="130" y="138" font-family="Georgia, serif" font-weight="900" font-size="68" fill="#e8e8e8">G</text>
+  <!-- Top crown dots -->
+  <circle cx="100" cy="10" r="4" fill="#c8a84b"/>
+  <circle cx="55" cy="32" r="3" fill="#c8a84b"/>
+  <circle cx="145" cy="32" r="3" fill="#c8a84b"/>
+</svg>
